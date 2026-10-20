@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Le Cortège</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One+SC&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&family=Caveat+Brush&family=Martian+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a city map seen from a rooftop. The march is the one loud thing: a long red snake of people on grey asphalt, the declared route in dashed préfecture blue. Placard cardboard for every panel. */
+:root {
+  --bg: #e9e4da;          /* pavement, dry */
+  --panel: #f6f1e6;
+  --ink: #1f1d1a;
+  --muted: #625d55;
+  --accent: #c8321f;      /* the march, the banner, and nothing else */
+  --line: #1f1d1a30;
+  --asphalt: #cfc9bd;
+  --block: #b9b2a3;
+  --block-hi: #c6bfb0;
+  --route: #2c4f9e;       /* préfecture blue */
+  --card: #d8b98a;        /* placard cardboard */
+  --card-ink: #2a2116;
+  --crowd: #c8321f;
+  --crowd-2: #e2683f;
+  --gold: #c08a1a;
+  --f-display: "Bowlby One SC", "Arial Black", Impact, sans-serif;
+  --f-body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-hand: "Caveat Brush", "Segoe Print", "Bradley Hand", cursive;
+  --f-mono: "Martian Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17161a; --panel: #222026; --ink: #ece7dd; --muted: #a39d92; --accent: #ff5a3c; --line: #ece7dd26;
+    --asphalt: #2a282e; --block: #1d1c21; --block-hi: #25232a; --route: #8fb0ff; --card: #b9925a; --card-ink: #1c150c;
+    --crowd: #ff5a3c; --crowd-2: #ff9a62; --gold: #e2b247;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17161a; --panel: #222026; --ink: #ece7dd; --muted: #a39d92; --accent: #ff5a3c; --line: #ece7dd26;
+  --asphalt: #2a282e; --block: #1d1c21; --block-hi: #25232a; --route: #8fb0ff; --card: #b9925a; --card-ink: #1c150c;
+  --crowd: #ff5a3c; --crowd-2: #ff9a62; --gold: #e2b247;
+  color-scheme: dark;
+}
+/* kit:css:begin */
+/* Arcade kit: structure only, never a look. Inlined between kit:css markers by kit/inline.mjs.
+   The game's own :root must define --bg --ink --muted --accent --panel --line (light), and
+   redefine them in both dark blocks; everything here reads those tokens. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+canvas { display: block; max-width: 100%; touch-action: none; }
+
+/* Full-stage screens (title, twist, end). Sit inside a position:relative stage. */
+.kit-overlay {
+  position: absolute; inset: 0; z-index: 5;
+  display: grid; place-items: center; padding: 24px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  overflow-y: auto;
+}
+.kit-overlay[hidden] { display: none; }
+
+/* Touch pad: shown only on coarse pointers; buttons carry data-key (see Kit.keys). */
+.kit-pad { display: none; gap: 10px; justify-content: center; padding-block: 10px; user-select: none; }
+.kit-pad [data-key] { min-width: 56px; min-height: 56px; touch-action: none; border: 1px solid var(--line); background: var(--panel); }
+@media (pointer: coarse) { .kit-pad { display: flex; } }
+
+.kit-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kit-deco, .kit-deco * { animation: none !important; transition: none !important; }
+}
+/* kit:css:end */
+[hidden] { display: none !important; }
+body { font-family: var(--f-body); padding-block: 10px; overflow: hidden; }
+.app { position: relative; height: calc(100dvh - 20px); max-width: 1180px; margin: 0 auto; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; }
+
+.hud { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px 10px; }
+.sign { background: var(--card); color: var(--card-ink); padding: 6px 12px 7px; display: grid; gap: 0; box-shadow: 2px 3px 0 var(--line); transform: rotate(-.6deg); }
+.sign:nth-child(2n) { transform: rotate(.5deg); }
+.sign span { font: 600 9.5px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; opacity: .75; }
+.sign b { font: 400 24px/1.05 var(--f-display); font-variant-numeric: tabular-nums; }
+.sign.clock b { font-family: var(--f-mono); font-weight: 600; font-size: 22px; }
+.sign.count { flex: 1; min-width: 210px; }
+.sign.count .pair { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.sign.count small { font: 400 11px var(--f-mono); opacity: .8; }
+.meter { display: grid; gap: 3px; min-width: 140px; flex: 1 1 140px; align-content: center; background: var(--panel); padding: 6px 10px; border: 1px solid var(--line); }
+.meter span { font: 600 9.5px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; }
+.bar { height: 9px; background: var(--line); }
+.bar i { display: block; height: 100%; width: 50%; background: var(--accent); transition: width .2s; }
+.strikes { font: 600 15px var(--f-mono); letter-spacing: .2em; color: var(--route); }
+
+.stage { position: relative; min-height: 0; border: 1.5px solid var(--ink); background: var(--asphalt); overflow: hidden; }
+.stage canvas { width: 100%; height: 100%; }
+.chant {
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%) rotate(-1.2deg); z-index: 3;
+  width: min(460px, calc(100% - 24px)); background: var(--card); color: var(--card-ink);
+  padding: 8px 14px 10px; box-shadow: 3px 4px 0 var(--line); text-align: center; pointer-events: none;
+}
+.chant small { display: block; font: 600 9.5px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; opacity: .7; }
+.chant p { margin: 2px 0 0; font: 400 clamp(22px, 3.4vw, 30px)/1.1 var(--f-hand); text-wrap: balance; }
+.chant .ring { height: 5px; background: color-mix(in srgb, var(--card-ink) 18%, transparent); margin-top: 6px; }
+.chant .ring i { display: block; height: 100%; width: 100%; background: var(--accent); }
+.chant.ok p { color: var(--accent); }
+.memo {
+  position: absolute; right: 10px; bottom: 10px; z-index: 3; width: min(330px, calc(100% - 20px));
+  background: var(--panel); border: 1.5px solid var(--route); border-left-width: 6px; padding: 8px 12px 10px;
+  font-size: 13.5px; line-height: 1.4; box-shadow: 3px 3px 0 var(--line);
+}
+.memo b { display: block; font: 600 9.5px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--route); margin-bottom: 2px; }
+.memo.warn { border-color: var(--accent); }
+.memo.warn b { color: var(--accent); }
+
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.ticker { flex: 1 1 260px; margin: 0; font-size: 14px; line-height: 1.4; min-height: 2.8em; color: var(--ink); font-style: italic; text-wrap: pretty; }
+.reply { font: 400 17px var(--f-display); letter-spacing: .02em; padding: 10px 18px; background: var(--accent); color: var(--panel); border: 0; box-shadow: 0 4px 0 var(--ink); touch-action: manipulation; }
+.reply:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.reply kbd { font: 600 10.5px var(--f-mono); opacity: .8; margin-left: 6px; }
+.keys { font: 400 11px var(--f-mono); color: var(--muted); }
+.kit-pad { padding-block: 0; }
+.kit-pad [data-key] { font-size: 20px; }
+.lang { display: inline-flex; border: 1.5px solid var(--ink); background: var(--panel); }
+.lang button { border: 0; background: transparent; padding: 5px 9px; font: 600 11px var(--f-mono); letter-spacing: .08em; color: var(--muted); }
+.lang button + button { border-left: 1px solid var(--line); }
+.lang button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+
+.kit-overlay { background: color-mix(in srgb, var(--bg) 86%, transparent); }
+.banner {
+  width: min(600px, 100%); background: var(--panel); border: 1.5px solid var(--ink); box-shadow: 6px 6px 0 var(--accent);
+  padding: 18px 20px 20px; display: grid; gap: 12px;
+}
+.banner .kicker { font: 600 10.5px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.banner h1, .banner h2 { margin: 0; font-family: var(--f-display); font-weight: 400; line-height: .95; }
+.banner h1 { font-size: clamp(44px, 9vw, 78px); }
+.banner h2 { font-size: clamp(28px, 5vw, 42px); text-wrap: balance; }
+.banner p { margin: 0; font-size: 15.5px; line-height: 1.55; text-wrap: pretty; }
+.banner .lede { font: 400 clamp(21px, 3vw, 26px)/1.2 var(--f-hand); color: var(--accent); }
+.banner ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14.5px; line-height: 1.45; }
+.banner .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.banner .row .lang { margin-left: auto; }
+.banner .fine { font: 400 10.5px var(--f-mono); color: var(--muted); }
+.go { font: 400 17px var(--f-display); padding: 12px 18px; background: var(--accent); color: var(--panel); border: 0; box-shadow: 0 4px 0 var(--ink); }
+.go:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); border-top: 1px dashed var(--muted); }
+.stats div { display: grid; padding-top: 7px; }
+.stats span { font: 600 9.5px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.stats b { font: 400 22px var(--f-display); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 560px) {
+  .sign b { font-size: 19px; }
+  .sign.clock b { font-size: 18px; }
+  .meter { min-width: 110px; }
+  .ticker { font-size: 13px; }
+  .keys { display: none; }
+  .memo { font-size: 12.5px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage" id="stage">
+    <canvas id="map" data-ta="mapAria" aria-label="Plan de la ville vu d'en haut. Le cortège est la longue file rouge, le parcours déclaré est en pointillés bleus."></canvas>
+    <div class="chant" id="chant" hidden><small id="chant-k">Slogan</small><p id="chant-p"></p><div class="ring"><i id="chant-ring"></i></div></div>
+    <div class="memo" id="memo" hidden><b id="memo-h">Préfecture</b><span id="memo-t"></span></div>
+
+    <div class="kit-overlay" id="title">
+      <article class="banner">
+        <span class="kicker" data-t="titleKicker">Manifestation déclarée · départ 14 h</span>
+        <h1 data-t="titleH">Le Cortège</h1>
+        <p class="lede" data-t="titleLede">Vous tenez la banderole de tête. Tout le monde vous suit. Personne ne sait où on va, à part la préfecture, qui change d'avis.</p>
+        <ul data-th="titleList">
+          <li><b>Guidez</b> le cortège avec les flèches (ou ZQSD, ou en touchant le plan) jusqu'à la place, en restant sur le parcours déclaré, en pointillés bleus. Il change en cours de route.</li>
+          <li>Trois sorties de parcours et la préfecture déclare la manifestation terminée.</li>
+          <li>Quand le slogan s'affiche, <b>répondez</b> (Espace ou le bouton) au bon moment. Un cortège qui ne chante plus se disperse.</li>
+          <li>Passez près des gens sur les trottoirs : ils vous rejoignent. Le camion merguez part à 18 h.</li>
+        </ul>
+        <div class="row"><button class="go" id="start" data-t="startBtn">Start the march</button><span class="fine" data-t="titleFine">environ 3 minutes · flèches, Espace</span><div class="lang" role="group" data-ta="langGroup" aria-label="Langue"></div></div>
+      </article>
+    </div>
+
+    <div class="kit-overlay" id="end" hidden>
+      <article class="banner">
+        <span class="kicker" id="end-k"></span>
+        <h2 id="end-title"></h2>
+        <p id="end-body"></p>
+        <div class="stats" id="end-stats"></div>
+        <div class="row"><button class="go" id="again" data-t="againBtn">Redéclarer une manif</button><span class="fine" id="end-best"></span><div class="lang" role="group" data-ta="langGroup" aria-label="Langue"></div></div>
+      </article>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p class="ticker" id="ticker" aria-live="polite"></p>
+    <button class="reply" id="reply" data-th="replyBtn">Répondre <kbd>Espace</kbd></button>
+    <div class="kit-pad"><button data-key="ArrowLeft" aria-label="Gauche">◀</button><button data-key="ArrowUp" aria-label="Haut">▲</button><button data-key="ArrowDown" aria-label="Bas">▼</button><button data-key="ArrowRight" aria-label="Droite">▶</button></div>
+    <span class="keys" data-t="keys">flèches ou ZQSD · Espace pour répondre</span>
+  </div>
+
+  <header class="hud">
+    <div class="sign clock"><span data-t="clockL">Heure</span><b id="clock">14:00</b></div>
+    <div class="sign count"><span data-t="countL">Participants</span>
+      <div class="pair"><b id="count-org">1</b><small id="count-org-l">selon les organisateurs</small><b id="count-pref">0</b><small id="count-pref-l">selon la préfecture</small></div></div>
+    <div class="meter"><span><span data-t="voiceL">Voix du cortège</span><em id="voice-n">60</em></span><div class="bar"><i id="voice"></i></div></div>
+    <div class="sign"><span data-t="strikesL">Avertissements</span><b class="strikes" id="strikes">○○○</b></div>
+    <div class="lang" role="group" data-ta="langGroup" aria-label="Langue"></div>
+  </header>
+</div>
+
+<script>
+/* kit:js:begin */
+// Arcade kit: the plumbing every game re-wrote by hand. Inlined between kit:js markers by
+// kit/inline.mjs, so a game stays one standalone file. Defines exactly two globals, `Kit` and
+// (once a game calls Kit.expose) `__arcade`; nothing else, because a bare top-level name can
+// collide with a window property (sandwich-diplomacy's `top()` shadowed by window.top).
+const Kit = (() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const themeWatchers = [];
+  const onTheme = () => themeWatchers.forEach(f => f());
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
+  new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // Canvas code cannot read CSS variables, so mirror the named tokens into an object and
+  // re-read it whenever the theme flips: the viewer's toggle sets data-theme, the OS sets the media query.
+  function tokens(names, onChange) {
+    const C = {};
+    const read = () => {
+      const cs = getComputedStyle(document.documentElement);
+      for (const n of names) C[n] = cs.getPropertyValue('--' + n).trim();
+      onChange?.(C);
+    };
+    read();
+    themeWatchers.push(read);
+    return C;
+  }
+
+  // Keeps a canvas sharp at the device pixel ratio (capped at 2) and sized to its CSS box.
+  function canvas(el, onResize) {
+    const view = { el, cx: el.getContext('2d'), W: 0, H: 0 };
+    const fit = () => {
+      const r = el.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+      view.W = r.width; view.H = r.height;
+      el.width = Math.round(r.width * d); el.height = Math.round(r.height * d);
+      view.cx.setTransform(d, 0, 0, d, 0, 0);
+      onResize?.(view);
+    };
+    new ResizeObserver(fit).observe(el);
+    fit();
+    return view;
+  }
+
+  // step(dt) gets seconds, capped at 50 ms so a background tab or a stalled frame cannot
+  // teleport the game; the loop stops while the tab is hidden and resumes without a jump.
+  function loop(step) {
+    let last = 0, raf = 0, on = false;
+    const frame = t => {
+      const dt = last ? Math.min(0.05, (t - last) / 1000) : 0;
+      last = t;
+      step(dt);
+      if (on) raf = requestAnimationFrame(frame);
+    };
+    const ctl = {
+      start() { if (on) return; on = true; last = 0; raf = requestAnimationFrame(frame); },
+      stop() { on = false; cancelAnimationFrame(raf); },
+      get running() { return on; },
+    };
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && on) { ctl.stop(); ctl.paused = true; }
+      else if (!document.hidden && ctl.paused) { ctl.paused = false; ctl.start(); }
+    });
+    return ctl;
+  }
+
+  // Held keys by KeyboardEvent.key, lower-cased (' ' for Space). Touch pads feed the same set:
+  // any element with data-key="<key>" inside a .kit-pad holds that key while pressed.
+  const held = new Set();
+  const pressFns = [];
+  const norm = k => (k.length === 1 ? k.toLowerCase() : k);
+  const press = (k, down) => {
+    k = norm(k);
+    if (down === held.has(k)) return;
+    down ? held.add(k) : held.delete(k);
+    pressFns.forEach(f => f(k, down));
+  };
+  const GAME_KEYS = new Set([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+  addEventListener('keydown', e => {
+    if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+    if (GAME_KEYS.has(e.key) && !e.target.closest?.('button')) e.preventDefault();
+    if (!e.repeat) press(e.key, true);
+  });
+  addEventListener('keyup', e => press(e.key, false));
+  addEventListener('blur', () => [...held].forEach(k => press(k, false)));
+  document.addEventListener('pointerdown', e => {
+    const b = e.target.closest?.('.kit-pad [data-key]');
+    if (!b) return;
+    e.preventDefault();
+    b.setPointerCapture?.(e.pointerId);
+    press(b.dataset.key, true);
+    const up = () => { press(b.dataset.key, false); b.removeEventListener('pointerup', up); b.removeEventListener('pointercancel', up); };
+    b.addEventListener('pointerup', up);
+    b.addEventListener('pointercancel', up);
+  });
+  const keys = {
+    down: k => held.has(norm(k)),
+    any: (...ks) => ks.some(k => held.has(norm(k))),
+    onPress(fn) { pressFns.push(fn); },
+  };
+
+  // The claude.ai viewer's hot-update hook: keeps `snapshot()` across a republish. Absent when
+  // self-hosted, so start() then receives {}.
+  function boot(start, snapshot) {
+    if (snapshot) window.claude?.hot?.snapshot?.(snapshot);
+    window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+  }
+
+  // The test hook smoke.mjs drives. endings: { name: { jump(), reached(), seconds? } } where
+  // jump() may shortcut the set-up but must leave the ending's final stretch to real game
+  // logic, and reached() is true only once that ending's screen is actually showing.
+  function expose({ state, endings }) {
+    window.__arcade = {
+      get state() { return state(); },
+      endings: Object.fromEntries(Object.entries(endings).map(([k, v]) => [k, { seconds: v.seconds ?? 8 }])),
+      jump: name => endings[name].jump(),
+      reached: name => !!endings[name].reached(),
+    };
+  }
+
+  // Show one overlay and hide the others; focus its first button so Enter/Space continue.
+  function show(el) {
+    document.querySelectorAll('.kit-overlay').forEach(o => { o.hidden = o !== el; });
+    el?.querySelector('button')?.focus({ preventScroll: true });
+  }
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  return { reduce, tokens, canvas, loop, keys, boot, expose, show, rnd, pick, clamp };
+})();
+/* kit:js:end */
+const $ = s => document.querySelector(s);
+const C = Kit.tokens(['bg', 'panel', 'ink', 'muted', 'accent', 'line', 'asphalt', 'block', 'block-hi', 'route', 'card', 'card-ink', 'crowd', 'crowd-2', 'gold']);
+const view = Kit.canvas($('#map'));
+
+// The city: a grid of street corners. Ids are r * COLS + c.
+const COLS = 9, ROWS = 6;
+const START = 5 * COLS + 0, PLACE = 0 * COLS + 8;
+const DAY_START = 14 * 60, DAY_END = 18 * 60, MIN_PER_S = 240 / 210;
+const MAX_STRIKES = 3, AMEND_EVERY = 28;
+const rc = id => [Math.floor(id / COLS), id % COLS];
+const idOf = (r, c) => r * COLS + c;
+const DIRS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+// ZQSD (AZERTY) and WASD both steer.
+const KEYMAP = { z: 'ArrowUp', w: 'ArrowUp', s: 'ArrowDown', q: 'ArrowLeft', a: 'ArrowLeft', d: 'ArrowRight' };
+
+function neighbours(id) {
+  const [r, c] = rc(id), out = [];
+  for (const [dr, dc] of Object.values(DIRS)) {
+    const rr = r + dr, cc = c + dc;
+    if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) out.push(idOf(rr, cc));
+  }
+  return out;
+}
+function path(from, to) {
+  const prev = new Map([[from, -1]]), q = [from];
+  while (q.length) {
+    const x = q.shift();
+    if (x === to) break;
+    for (const n of Kit.pick([0, 1]) ? neighbours(x) : neighbours(x).reverse()) if (!prev.has(n)) { prev.set(n, x); q.push(n); }
+  }
+  const out = [];
+  for (let x = to; x !== -1; x = prev.get(x)) out.unshift(x);
+  return out;
+}
+// The préfecture's itinerary: from here to the square, by way of somewhere it would prefer.
+function makeRoute(from) {
+  const [fr, fc] = rc(from);
+  const cands = [];
+  for (let id = 0; id < COLS * ROWS; id++) {
+    const [r, c] = rc(id);
+    const d = Math.abs(r - fr) + Math.abs(c - fc);
+    if (id !== PLACE && id !== from && d >= 2 && d <= 5) cands.push(id);
+  }
+  const via = Kit.pick(cands);
+  return [...path(from, via), ...path(via, PLACE).slice(1)];
+}
+
+// Who stands on the pavement, how many of them, and what they add.
+const GROUPS = [
+  { id: 'retired', n: [12, 30], voice: 2 },
+  { id: 'pupils', n: [25, 60], voice: 6 },
+  { id: 'band', n: [14, 18], voice: 18 },
+  { id: 'dog', n: [1, 1], voice: 1 },
+  { id: 'sound', n: [4, 6], voice: 25 },
+  { id: 'nurses', n: [20, 45], voice: 4 },
+  { id: 'mime', n: [1, 1], voice: 0 },
+  { id: 'tourist', n: [1, 1], voice: 0 },
+  { id: 'bakers', n: [8, 15], voice: 3 },
+  { id: 'cyclists', n: [10, 25], voice: 2 },
+];
+
+const I18N = {
+  fr: {
+    docTitle: 'Le Cortège', langGroup: 'Langue',
+    mapAria: "Plan de la ville vu d'en haut. Le cortège est la longue file rouge, le parcours déclaré est en pointillés bleus.",
+    titleKicker: 'Manifestation déclarée · départ 14 h', titleH: 'Le Cortège',
+    titleLede: "Vous tenez la banderole de tête. Tout le monde vous suit. Personne ne sait où on va, à part la préfecture, qui change d'avis.",
+    titleList: "<li><b>Guidez</b> le cortège avec les flèches (ou ZQSD, ou en touchant le plan) jusqu'à la place, en restant sur le parcours déclaré, en pointillés bleus. Il change en cours de route.</li>"
+      + '<li>Trois sorties de parcours et la préfecture déclare la manifestation terminée.</li>'
+      + "<li>Quand le slogan s'affiche, <b>répondez</b> (Espace ou le bouton) au bon moment. Un cortège qui ne chante plus se disperse.</li>"
+      + '<li>Passez près des gens sur les trottoirs : ils vous rejoignent. Le camion merguez part à 18 h.</li>',
+    startBtn: 'Lancer le cortège', titleFine: 'environ 3 minutes · flèches, Espace',
+    againBtn: 'Redéclarer une manif',
+    replyBtn: 'Répondre <kbd>Espace</kbd>', keys: 'flèches ou ZQSD · Espace pour répondre',
+    clockL: 'Heure', countL: 'Participants', orgL: 'selon les organisateurs', prefL: 'selon la préfecture',
+    voiceL: 'Voix du cortège', strikesL: 'Avertissements',
+    place: 'PLACE DU GRAND-PEUT-ÊTRE', start: 'DÉPART', merguez: 'MERGUEZ',
+    banner: 'LA VIE EST CHÈRE', chantK: 'Slogan', chantOk: 'Repris en chœur',
+    calls: [
+      ["« Qu'est-ce qu'on veut ? »", '« Des prix moins chers ! »'],
+      ['« Quand est-ce qu\'on les veut ? »', '« Maintenant ! »'],
+      ['« On lâche… »', '« … rien ! »'],
+      ['« Tous ensemble ! »', '« Tous ensemble, ouais ! »'],
+      ["« Ce n'est qu'un début… »", '« … continuons le combat ! »'],
+      ['« La baguette à… »', '« … un euro ! »'],
+    ],
+    groups: {
+      retired: ['Des retraités', 'Des retraités rejoignent le cortège. Ils connaissent déjà tous les slogans, en mieux.'],
+      pupils: ['Des lycéens', 'Une classe entière rejoint le cortège. Le contrôle de maths est reporté sine die.'],
+      band: ['Une fanfare', "Une fanfare s'insère. Elle ne joue qu'un morceau, très fort, en boucle."],
+      dog: ['Un chien', 'Un chien rejoint le cortège. Il ne sait pas pourquoi. Il est très motivé.'],
+      sound: ['Le camion sono', 'Le camion sono arrive. Il diffuse un morceau de 1995 que tout le monde connaît.'],
+      nurses: ['Des infirmières', 'Des infirmières rejoignent le cortège, entre deux gardes.'],
+      mime: ['Un mime', 'Un mime rejoint le cortège. Il scande en silence.'],
+      tourist: ['Un touriste perdu', 'Un touriste perdu rejoint le cortège. Il pensait que c\'était la visite guidée.'],
+      bakers: ['Des boulangers', 'Des boulangers rejoignent le cortège. Ils ont apporté des chouquettes.'],
+      cyclists: ['Des cyclistes', 'Des cyclistes rejoignent le cortège, en roue libre.'],
+    },
+    prefH: 'Préfecture · arrêté', warnH: 'Préfecture · avertissement',
+    amend: [
+      'Arrêté n° 2026-1017 : le cortège passera désormais par la rue d\'à côté.',
+      'La préfecture rappelle que le parcours déclaré est le parcours déclaré. Il a changé.',
+      'Pour des raisons de sécurité, le cortège évitera la rue qu\'il allait prendre.',
+      'Modification d\'itinéraire : un vide-grenier occupe le boulevard.',
+      'Le parcours est prolongé de quelques rues, pour l\'ambiance.',
+      "Le parcours initial reste valable, à l'exception de tout ce qu'il contenait.",
+    ],
+    strike: n => `Sortie du parcours déclaré. Avertissement ${n} sur 3. Un nouveau parcours vous est attribué.`,
+    tickStart: 'Le cortège se met en marche. Quelqu\'un, au fond, demande déjà où on va.',
+    tickLate: 'Trop tôt. Vous avez répondu au silence. Le silence a mal pris la chose.',
+    tickMiss: "Personne n'a répondu. Le slogan retombe sur le trottoir.",
+    tickOk: 'Repris par tout le cortège. Les fenêtres s\'ouvrent.',
+    tickLow: 'Le cortège faiblit. Quelques personnes regardent les terrasses.',
+    tickBig: n => `${n} personnes selon les organisateurs. La préfecture, elle, a compté les pigeons.`,
+    ends: {
+      arrived: { k: 'Place du Grand-Peut-Être · fin de parcours', t: 'Arrivée sur la place',
+        b: (o, p) => `Le cortège déboule sur la place : ${o} personnes selon les organisateurs, ${p} selon la préfecture. La sono tombe en panne au premier mot du discours. Personne n'entend rien. Tout le monde applaudit quand même, très fort. Le camion merguez réalise le meilleur chiffre de son histoire.` },
+      dispersed: { k: 'Fin de manifestation', t: 'Le cortège s\'est dissous',
+        b: () => "Plus personne ne chante. Les gens se dispersent par petits groupes, vers les terrasses. La banderole reste seule au milieu de la rue, et continue un peu sans vous." },
+      merguez: { k: '18 h', t: 'Le camion merguez est parti',
+        b: () => "Il est 18 h. Le camion merguez replie son auvent et s'en va. Sans merguez, un cortège n'a plus vraiment de raison d'être. On se donne rendez-vous jeudi, même heure, même slogan." },
+      banned: { k: 'Préfecture · courrier recommandé', t: 'Manifestation déclarée terminée',
+        b: () => "Troisième sortie de parcours. La préfecture déclare la manifestation terminée, par courrier recommandé. Il arrivera dans trois à cinq jours ouvrés. Tout le cortège décide de l'attendre sur place, ce qui, techniquement, est un rassemblement." },
+    },
+    statNames: ['Organisateurs', 'Préfecture', 'Slogans repris', 'Rues parcourues', 'Arrêtés reçus'],
+    best: b => `record de la session : ${b} personnes`,
+  },
+  en: {
+    docTitle: 'The March', langGroup: 'Language',
+    mapAria: 'A city map seen from above. The march is the long red line; the declared route is the dashed blue line.',
+    titleKicker: 'Declared protest · sets off at 2 pm', titleH: 'The March',
+    titleLede: 'You are holding the front banner. Everyone follows you. Nobody knows where you are going, except the authorities, who keep changing their minds.',
+    titleList: '<li><b>Steer</b> the march with the arrow keys (or WASD, or by tapping the map) to the square, staying on the declared route, dashed in blue. It changes on the way.</li>'
+      + '<li>Leave the route three times and the authorities declare the protest over.</li>'
+      + '<li>When a chant appears, <b>answer</b> it (Space or the button) at the right moment. A march that stops chanting breaks up.</li>'
+      + '<li>Pass close to people on the pavement and they join in. The merguez van leaves at 6 pm.</li>',
+    startBtn: 'Start the march', titleFine: 'about 3 minutes · arrows, Space',
+    againBtn: 'Declare another march',
+    replyBtn: 'Answer <kbd>Space</kbd>', keys: 'arrows or WASD · Space to answer',
+    clockL: 'Time', countL: 'Turnout', orgL: 'say the organisers', prefL: 'say the police',
+    voiceL: 'Voice of the march', strikesL: 'Warnings',
+    place: 'SQUARE OF THE GREAT PERHAPS', start: 'START', merguez: 'MERGUEZ',
+    banner: 'EVERYTHING COSTS TOO MUCH', chantK: 'Chant', chantOk: 'Everyone joins in',
+    calls: [
+      ['“What do we want?”', '“Lower prices!”'],
+      ['“When do we want them?”', '“Now!”'],
+      ['“Whose streets?”', '“Our streets!”'],
+      ['“The people, united…”', '“…will never be defeated!”'],
+      ['“Hey hey, ho ho…”', '“…these prices have got to go!”'],
+      ['“Bread for…”', '“…one euro!”'],
+    ],
+    groups: {
+      retired: ['Pensioners', 'Some pensioners join the march. They already know all the chants, and better ones.'],
+      pupils: ['School pupils', 'A whole class joins the march. The maths test is postponed indefinitely.'],
+      band: ['A brass band', 'A brass band slots in. It knows one tune, and plays it very loudly, forever.'],
+      dog: ['A dog', 'A dog joins the march. It does not know why. It is extremely committed.'],
+      sound: ['The sound truck', 'The sound truck arrives, playing a song from 1995 that everyone knows.'],
+      nurses: ['Nurses', 'Some nurses join the march between shifts.'],
+      mime: ['A mime', 'A mime joins the march. They chant in silence.'],
+      tourist: ['A lost tourist', 'A lost tourist joins the march, believing it to be the guided tour.'],
+      bakers: ['Bakers', 'Some bakers join the march. They have brought pastries.'],
+      cyclists: ['Cyclists', 'Some cyclists join the march, freewheeling.'],
+    },
+    prefH: 'Prefecture · order', warnH: 'Prefecture · warning',
+    amend: [
+      'Order no. 2026-1017: the march will now take the next street along.',
+      'The prefecture reminds you that the declared route is the declared route. It has changed.',
+      'For safety reasons, the march will avoid the street it was about to take.',
+      'Route change: a flea market has taken over the boulevard.',
+      'The route is extended by a few streets, for atmosphere.',
+      'The original route remains valid, except for everything that was on it.',
+    ],
+    strike: n => `Off the declared route. Warning ${n} of 3. A new route has been issued.`,
+    tickStart: 'The march sets off. Someone at the back is already asking where it is going.',
+    tickLate: 'Too early. You answered the silence. The silence took it badly.',
+    tickMiss: 'Nobody answered. The chant falls flat on the pavement.',
+    tickOk: 'The whole march picks it up. Windows open.',
+    tickLow: 'The march is flagging. A few people are eyeing the café terraces.',
+    tickBig: n => `${n} people, say the organisers. The police counted the pigeons.`,
+    ends: {
+      arrived: { k: 'Square of the Great Perhaps · end of route', t: 'Into the square',
+        b: (o, p) => `The march pours into the square: ${o} people according to the organisers, ${p} according to the police. The sound system dies on the first word of the speech. Nobody hears a thing. Everyone cheers anyway, very loudly. The merguez van has the best day in its history.` },
+      dispersed: { k: 'End of the protest', t: 'The march has melted away',
+        b: () => 'Nobody is chanting any more. People drift off in small groups towards the café terraces. The banner is left alone in the middle of the street, and carries on for a bit without you.' },
+      merguez: { k: '6 pm', t: 'The merguez van has gone',
+        b: () => 'It is 6 pm. The merguez van folds its awning and drives off. Without merguez, a march has no real reason to exist. Same time Thursday, same chant.' },
+      banned: { k: 'Prefecture · recorded delivery', t: 'Protest declared over',
+        b: () => 'A third time off the route. The prefecture declares the protest over, by recorded letter. It will arrive in three to five working days. The whole march decides to wait for it right here, which, technically, is a rally.' },
+    },
+    statNames: ['Organisers', 'Police', 'Chants answered', 'Streets marched', 'Orders received'],
+    best: b => `best this session: ${b} people`,
+  },
+};
+
+// French typography: a narrow no-break space before ? ! : ; » and after «, applied once to every
+// French string (and to whatever a French string function returns).
+(function frenchSpacing() {
+  const fix = s => s.replace(/ ([?!:;»])/g, ' $1').replace(/« /g, '« ');
+  const deep = v => typeof v === 'string' ? fix(v)
+    : typeof v === 'function' ? (...a) => fix(v(...a))
+    : Array.isArray(v) ? v.map(deep)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, deep(x)]))
+    : v;
+  I18N.fr = deep(I18N.fr);
+})();
+
+let lang = 'fr';
+const t = k => I18N[lang][k] ?? I18N.fr[k];
+for (const k of ['calls', 'amend', 'statNames']) {
+  if (I18N.fr[k].length !== I18N.en[k].length) console.error(`i18n: ${k} differs in length`);
+}
+
+let S;
+function fresh(best = 0) {
+  const route = makeRoute(START);
+  return {
+    mode: 'title', best, t: 0, clock: DAY_START,
+    a: START, b: route[1], u: 0, want: null, route,
+    count: 1, voice: 60, strikes: 0, streets: 0, orders: 0, chantsOk: 0,
+    trail: [], groups: [], spawnT: 1.5, amendT: AMEND_EVERY,
+    chant: { phase: 'idle', t: 4, i: 0, win: 1.5 }, ending: null, lowSaid: false, bigSaid: 0,
+  };
+}
+const policeCount = n => Math.max(0, Math.round(n / 2.7));
+
+// Lines on screen are thunks, re-read after a language switch.
+let tickFn = () => '', memoFn = null, memoWarn = false;
+function tick(fn) { tickFn = fn; $('#ticker').textContent = fn(); }
+function memo(fn, warn) {
+  memoFn = fn; memoWarn = warn;
+  $('#memo-h').textContent = t(warn ? 'warnH' : 'prefH');
+  $('#memo-t').textContent = fn();
+  $('#memo').classList.toggle('warn', !!warn);
+  $('#memo').hidden = false;
+  S.memoT = 6;
+}
+
+function hud() {
+  const m = Math.min(DAY_END, Math.floor(S.clock));
+  $('#clock').textContent = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  $('#count-org').textContent = S.count.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-GB');
+  $('#count-pref').textContent = policeCount(S.count).toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-GB');
+  $('#count-org-l').textContent = t('orgL'); $('#count-pref-l').textContent = t('prefL');
+  const v = Math.round(S.voice);
+  $('#voice').style.width = v + '%'; $('#voice-n').textContent = v;
+  $('#strikes').textContent = '●'.repeat(S.strikes) + '○'.repeat(MAX_STRIKES - S.strikes);
+}
+
+function startGame() {
+  S = fresh(S ? S.best : 0);
+  S.mode = 'march';
+  $('#memo').hidden = true; $('#chant').hidden = true;
+  tick(() => t('tickStart'));
+  Kit.show(null);
+  hud();
+}
+$('#start').onclick = startGame;
+$('#again').onclick = startGame;
+
+// Steering: the last arrow pressed is taken at the next corner, if that street exists.
+Kit.keys.onPress((k, down) => {
+  if (!down || !S || S.mode !== 'march') return;
+  const key = KEYMAP[k] || k;
+  if (DIRS[key]) S.want = DIRS[key];
+  else if (k === ' ') answer();
+});
+$('#reply').onclick = e => { e.currentTarget.blur(); answer(); };
+$('#map').addEventListener('pointerdown', e => {
+  if (!S || S.mode !== 'march') return;
+  const r = e.currentTarget.getBoundingClientRect(), g = geo();
+  const [hx, hy] = headPx(g), dx = e.clientX - r.left - hx, dy = e.clientY - r.top - hy;
+  S.want = Math.abs(dx) > Math.abs(dy) ? [0, Math.sign(dx)] : [Math.sign(dy), 0];
+});
+
+function nextFrom(at, from) {
+  const [r, c] = rc(at), [fr, fc] = rc(from);
+  const straight = [r - fr, c - fc];
+  const step = d => { const rr = r + d[0], cc = c + d[1]; return rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS ? idOf(rr, cc) : -1; };
+  if (S.want) { const n = step(S.want); if (n >= 0 && n !== from) { S.want = null; return n; } }
+  const s = step(straight);
+  if (s >= 0) return s;
+  const opts = neighbours(at).filter(n => n !== from);
+  return opts.length ? Kit.pick(opts) : from;
+}
+
+function arrive(at) {
+  S.streets++;
+  if (at === PLACE) return endGame('arrived');
+  const i = S.route.indexOf(at);
+  if (i >= 0) S.route = S.route.slice(i);
+  else {
+    S.strikes++;
+    hud();
+    if (S.strikes >= MAX_STRIKES) return endGame('banned');
+    const n = S.strikes;
+    memo(() => t('strike')(n), true);
+    S.route = makeRoute(at);
+  }
+}
+
+function answer() {
+  if (!S || S.mode !== 'march') return;
+  const ch = S.chant;
+  if (ch.phase === 'call') {
+    ch.phase = 'ok'; ch.t = 1.4;
+    S.chantsOk++;
+    S.voice = Math.min(100, S.voice + 14);
+    S.count += Math.round(S.count * .03);
+    paintChant();
+    tick(() => t('tickOk'));
+  } else if (ch.phase === 'idle') {
+    S.voice = Math.max(0, S.voice - 4);
+    tick(() => t('tickLate'));
+  }
+}
+function paintChant() {
+  const ch = S.chant, el = $('#chant');
+  if (ch.phase === 'idle') { el.hidden = true; return; }
+  const [call, resp] = t('calls')[ch.i];
+  el.hidden = false;
+  el.classList.toggle('ok', ch.phase === 'ok');
+  $('#chant-k').textContent = ch.phase === 'ok' ? t('chantOk') : t('chantK');
+  $('#chant-p').textContent = ch.phase === 'ok' ? resp : call;
+}
+
+function spawnGroup() {
+  // a group waits on a street the march has not just walked down
+  for (let tries = 0; tries < 20; tries++) {
+    const a = Math.floor(Math.random() * COLS * ROWS), b = Kit.pick(neighbours(a));
+    if ((a === S.a && b === S.b) || (a === S.b && b === S.a)) continue;
+    if (S.groups.some(g => (g.a === a && g.b === b) || (g.a === b && g.b === a))) continue;
+    const def = Kit.pick(GROUPS);
+    S.groups.push({ a, b, def, n: Math.round(Kit.rnd(def.n[0], def.n[1])), life: Kit.rnd(18, 28), ph: Math.random() * 6 });
+    return;
+  }
+}
+
+function update(dt) {
+  S.t += dt;
+  S.clock += dt * MIN_PER_S;
+  // a big march is a slow march
+  const speed = .62 - Math.min(.22, S.count / 2500);
+  S.u += speed * dt;
+  while (S.u >= 1 && S.mode === 'march') {
+    S.u -= 1;
+    const from = S.a, at = S.b;
+    S.a = at;
+    arrive(at);
+    if (S.mode !== 'march') return;
+    S.b = nextFrom(at, from);
+  }
+  const g = geo(), [hx, hy] = headPx(g);
+  S.trail.push([hx / g.s, hy / g.s]);
+  if (S.trail.length > 1600) S.trail.shift();
+
+  // joining: anyone the head of the march passes close to
+  const pos = headGrid();
+  S.groups = S.groups.filter(gp => {
+    gp.life -= dt;
+    const gpPos = mid(gp.a, gp.b);
+    if (Math.hypot(gpPos[0] - pos[0], gpPos[1] - pos[1]) < .32) {
+      const joined = Math.max(1, Math.round(gp.n * (.5 + S.voice / 200)));
+      S.count += joined;
+      S.voice = Math.min(100, S.voice + gp.def.voice);
+      const id = gp.def.id;
+      tick(() => t('groups')[id][1]);
+      return false;
+    }
+    return gp.life > 0;
+  });
+  S.spawnT -= dt;
+  if (S.spawnT <= 0 && S.groups.length < 6) { spawnGroup(); S.spawnT = Kit.rnd(2.2, 4); }
+
+  // the préfecture amends the route now and then, from wherever the march is heading
+  S.amendT -= dt;
+  if (S.amendT <= 0) {
+    S.amendT = AMEND_EVERY;
+    S.route = makeRoute(S.b);
+    S.orders++;
+    const i = Math.floor(Math.random() * I18N.fr.amend.length);
+    memo(() => t('amend')[i], false);
+  }
+  if (S.memoT > 0) { S.memoT -= dt; if (S.memoT <= 0) $('#memo').hidden = true; }
+
+  // chants: a call, a short window to answer, then quiet
+  const ch = S.chant;
+  ch.t -= dt;
+  if (ch.phase === 'idle' && ch.t <= 0) {
+    ch.phase = 'call'; ch.t = ch.win; ch.i = Math.floor(Math.random() * I18N.fr.calls.length);
+    paintChant();
+  } else if (ch.phase === 'call') {
+    $('#chant-ring').style.width = Math.max(0, ch.t / ch.win * 100) + '%';
+    if (ch.t <= 0) {
+      S.voice = Math.max(0, S.voice - 12);
+      ch.phase = 'idle'; ch.t = Kit.rnd(3.5, 6);
+      paintChant();
+      tick(() => t('tickMiss'));
+    }
+  } else if (ch.phase === 'ok' && ch.t <= 0) {
+    ch.phase = 'idle'; ch.t = Kit.rnd(3.5, 6);
+    paintChant();
+  }
+  S.voice = Math.max(0, S.voice - dt * .9);
+  if (S.voice < 20 && !S.lowSaid) { S.lowSaid = true; tick(() => t('tickLow')); }
+  if (S.voice >= 30) S.lowSaid = false;
+  if (S.count >= 500 * (S.bigSaid + 1)) { S.bigSaid++; const n = S.count.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-GB'); tick(() => t('tickBig')(n)); }
+
+  if (S.voice <= 0) return endGame('dispersed');
+  if (S.clock >= DAY_END) return endGame('merguez');
+  hud();
+}
+
+function endGame(kind) {
+  S.mode = 'end'; S.ending = kind;
+  S.best = Math.max(S.best, S.count);
+  $('#chant').hidden = true; $('#memo').hidden = true;
+  hud();
+  paintEnd();
+  Kit.show($('#end'));
+}
+function paintEnd() {
+  const E = t('ends')[S.ending], loc = lang === 'fr' ? 'fr-FR' : 'en-GB';
+  const o = S.count.toLocaleString(loc), p = policeCount(S.count).toLocaleString(loc);
+  $('#end-k').textContent = E.k;
+  $('#end-title').textContent = E.t;
+  $('#end-body').textContent = E.b(o, p);
+  const vals = [o, p, S.chantsOk, S.streets, S.orders];
+  $('#end-stats').innerHTML = t('statNames').map((k, i) => `<div><span>${k}</span><b>${vals[i]}</b></div>`).join('');
+  $('#end-best').textContent = t('best')(S.best.toLocaleString(loc));
+}
+
+// Geometry: corners sit on a grid inside the canvas with a margin for the labels.
+function geo() {
+  const { W, H } = view;
+  const s = Math.min((W - 40) / (COLS - 1), (H - 60) / (ROWS - 1));
+  return { s, ox: (W - s * (COLS - 1)) / 2, oy: (H - s * (ROWS - 1)) / 2 + 12 };
+}
+const px = (g, id) => { const [r, c] = rc(id); return [g.ox + c * g.s, g.oy + r * g.s]; };
+const mid = (a, b) => { const [ar, ac] = rc(a), [br, bc] = rc(b); return [(ac + bc) / 2, (ar + br) / 2]; };
+function headGrid() { const [ar, ac] = rc(S.a), [br, bc] = rc(S.b); return [ac + (bc - ac) * S.u, ar + (br - ar) * S.u]; }
+function headPx(g) { const [x, y] = headGrid(); return [g.ox + x * g.s, g.oy + y * g.s]; }
+
+function draw() {
+  const { cx, W, H } = view;
+  if (!W || !H || !S) return;
+  const g = geo(), s = g.s;
+  cx.fillStyle = C.asphalt; cx.fillRect(0, 0, W, H);
+  // city blocks between the streets
+  const street = Math.max(10, s * .26);
+  for (let r = -1; r < ROWS; r++) for (let c = -1; c < COLS; c++) {
+    const x = g.ox + c * s + street / 2, y = g.oy + r * s + street / 2, w = s - street, h = s - street;
+    cx.fillStyle = (r + c) % 3 === 0 ? C['block-hi'] : C.block;
+    cx.fillRect(x, y, w, h);
+  }
+  // the square and the start
+  const [qx, qy] = px(g, PLACE), [sx, sy] = px(g, START);
+  cx.fillStyle = C.panel; cx.beginPath(); cx.arc(qx, qy, s * .42, 0, 7); cx.fill();
+  cx.strokeStyle = C.gold; cx.lineWidth = 3; cx.stroke();
+  cx.fillStyle = C.ink; cx.font = `400 ${Math.max(10, Math.round(s * .13))}px ${getComputedStyle(document.documentElement).getPropertyValue('--f-display')}`;
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText(t('place'), Math.min(W - 70, qx - s * .2), qy + s * .58, Math.min(220, s * 2.4));
+  cx.fillStyle = C.muted; cx.fillText(t('start'), sx + s * .1, sy + s * .48, s * 1.4);
+  // the merguez van, parked at the square until six
+  cx.fillStyle = C.gold; cx.fillRect(qx - s * .62, qy - s * .2, s * .26, s * .16);
+  cx.fillStyle = C.ink; cx.font = `600 ${Math.max(8, Math.round(s * .07))}px Martian Mono, monospace`;
+  cx.fillText(t('merguez'), qx - s * .49, qy - s * .27, s * .6);
+
+  // the declared route
+  cx.save();
+  cx.strokeStyle = C.route; cx.lineWidth = Math.max(3, s * .05); cx.setLineDash([s * .12, s * .1]); cx.lineCap = 'round';
+  cx.beginPath();
+  const [hx, hy] = headPx(g);
+  cx.moveTo(hx, hy);
+  for (const id of S.route) { const [x, y] = px(g, id); cx.lineTo(x, y); }
+  cx.stroke(); cx.restore();
+
+  // people waiting on the pavement
+  for (const gp of S.groups) {
+    const [mx, my] = mid(gp.a, gp.b), x = g.ox + mx * s, y = g.oy + my * s;
+    const k = Math.min(1, gp.life / 3), dots = Math.min(14, 2 + Math.round(gp.n / 5));
+    cx.globalAlpha = k;
+    cx.fillStyle = C.ink;
+    for (let i = 0; i < dots; i++) {
+      const a = i * 2.4 + gp.ph, rr = s * .05 + (i % 4) * s * .025;
+      cx.beginPath(); cx.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, Math.max(2, s * .028), 0, 7); cx.fill();
+    }
+    cx.fillStyle = C.card; const lbl = t('groups')[gp.def.id][0];
+    cx.font = `600 ${Math.max(9, Math.round(s * .085))}px Archivo, sans-serif`;
+    const tw = Math.min(s * 1.3, cx.measureText(lbl).width) + 8;
+    cx.fillRect(x - tw / 2, y - s * .25, tw, s * .13);
+    cx.fillStyle = C['card-ink']; cx.fillText(lbl, x, y - s * .185, s * 1.3);
+    cx.globalAlpha = 1;
+  }
+
+  // the march: a thick line of people along the trail, longer and wider as it grows
+  const tr = S.trail, n = S.count;
+  const lenPts = Math.min(tr.length, Math.round(20 + Math.min(n, 3000) / 4));
+  if (lenPts > 1) {
+    const width = Math.max(6, s * (.07 + Math.min(.16, n / 4000)));
+    cx.strokeStyle = C.crowd; cx.lineWidth = width; cx.lineCap = 'round'; cx.lineJoin = 'round';
+    cx.beginPath();
+    for (let i = tr.length - lenPts; i < tr.length; i++) { const [x, y] = tr[i]; i === tr.length - lenPts ? cx.moveTo(x * s, y * s) : cx.lineTo(x * s, y * s); }
+    cx.stroke();
+    // placards bobbing along it
+    cx.fillStyle = C.card;
+    for (let i = tr.length - 8; i > tr.length - lenPts; i -= 9) {
+      const [x, y] = tr[i], bob = Kit.reduce ? 0 : Math.sin(S.t * 4 + i) * 1.5;
+      cx.save(); cx.translate(x * s, y * s + bob); cx.rotate(Math.sin(i) * .3);
+      cx.fillRect(-width * .45, -width * .9, width * .9, width * .55); cx.restore();
+    }
+    cx.fillStyle = C['crowd-2'];
+    for (let i = tr.length - 3; i > tr.length - lenPts; i -= 4) {
+      const [x, y] = tr[i];
+      cx.beginPath(); cx.arc(x * s + Math.sin(i * 1.7) * width * .3, y * s + Math.cos(i * 1.3) * width * .3, Math.max(1.5, width * .14), 0, 7); cx.fill();
+    }
+  }
+  // the front banner, across the direction of travel
+  const [ar, ac] = rc(S.a), [br, bc] = rc(S.b), ang = Math.atan2(br - ar, bc - ac);
+  cx.save(); cx.translate(hx, hy); cx.rotate(ang + Math.PI / 2);
+  const bw = Math.max(44, s * .62), bh = Math.max(12, s * .16);
+  cx.fillStyle = C.panel; cx.fillRect(-bw / 2, -bh / 2, bw, bh);
+  cx.strokeStyle = C.accent; cx.lineWidth = 2; cx.strokeRect(-bw / 2, -bh / 2, bw, bh);
+  cx.fillStyle = C.accent; cx.font = `400 ${Math.max(7, Math.round(bh * .55))}px ${getComputedStyle(document.documentElement).getPropertyValue('--f-display')}`;
+  cx.fillText(t('banner'), 0, 1, bw - 6);
+  cx.restore();
+}
+
+const loop = Kit.loop(dt => {
+  if (S && S.mode === 'march') update(dt);
+  draw();
+});
+
+// Static markup carries data-t (text), data-th (trusted markup from I18N) and data-ta
+// (aria-label). The HUD, ticker, memo, chant and end card are repainted here.
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.title = t('docTitle');
+  for (const el of document.querySelectorAll('[data-t]')) el.textContent = t(el.dataset.t);
+  for (const el of document.querySelectorAll('[data-th]')) el.innerHTML = t(el.dataset.th);
+  for (const el of document.querySelectorAll('[data-ta]')) el.setAttribute('aria-label', t(el.dataset.ta));
+  for (const box of document.querySelectorAll('.lang')) {
+    if (!box.children.length) box.innerHTML = '<button type="button" data-lang="fr" lang="fr">FR</button><button type="button" data-lang="en" lang="en">EN</button>';
+    for (const b of box.children) b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
+  }
+  if (!S) return;
+  hud();
+  $('#ticker').textContent = tickFn();
+  if (memoFn && !$('#memo').hidden) { $('#memo-h').textContent = t(memoWarn ? 'warnH' : 'prefH'); $('#memo-t').textContent = memoFn(); }
+  if (S.mode === 'march') paintChant();
+  if (S.mode === 'end') paintEnd();
+}
+function setLang(l) {
+  if (!(l in I18N) || l === lang) return;
+  lang = l;
+  applyLang();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-lang]');
+  if (b) setLang(b.dataset.lang);
+});
+
+function start(data) {
+  lang = data?.lang in I18N ? data.lang : (navigator.language || '').toLowerCase().startsWith('fr') ? 'fr' : 'en';
+  S = fresh(data.best || 0);
+  applyLang();
+  Kit.show($('#title'));
+  loop.start();
+}
+Kit.boot(start, () => ({ best: S ? S.best : 0, lang }));
+
+// Test hook. Each jump sets up the last stretch and leaves the ending itself to the game.
+function oneStepFromPlace() {
+  // heading down the last street into the square, on the declared route
+  S.a = PLACE - 1; S.b = PLACE; S.u = 0; S.route = [PLACE]; S.trail = [];
+}
+Kit.expose({
+  state: () => S,
+  endings: {
+    arrived: { seconds: 6, jump() { startGame(); S.count = 840; oneStepFromPlace(); }, reached: () => S.ending === 'arrived' && !$('#end').hidden },
+    dispersed: { seconds: 8, jump() { startGame(); S.voice = 2; S.chant.t = 30; }, reached: () => S.ending === 'dispersed' && !$('#end').hidden },
+    merguez: { seconds: 8, jump() { startGame(); S.clock = DAY_END - 2; S.voice = 100; S.chant.t = 30; }, reached: () => S.ending === 'merguez' && !$('#end').hidden },
+    // the route is reduced to the square alone, so the next corner is off it
+    banned: { seconds: 8, jump() { startGame(); S.strikes = 2; S.voice = 100; S.chant.t = 30; S.a = START; S.b = START - COLS; S.u = 0; S.route = [PLACE]; }, reached: () => S.ending === 'banned' && !$('#end').hidden },
+  },
+});
+</script>
+</body>
+</html>
