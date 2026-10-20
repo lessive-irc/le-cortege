@@ -127,6 +127,8 @@ body { font-family: var(--f-body); padding-block: 10px; overflow: hidden; }
 .reply { font: 400 17px var(--f-display); letter-spacing: .02em; padding: 10px 18px; background: var(--accent); color: var(--panel); border: 0; box-shadow: 0 4px 0 var(--ink); touch-action: manipulation; }
 .reply:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
 .reply kbd { font: 600 10.5px var(--f-mono); opacity: .8; margin-left: 6px; }
+.reply.casse { background: var(--ink); color: var(--panel); box-shadow: 0 4px 0 var(--accent); }
+.bar i.gas { background: var(--route); }
 .keys { font: 400 11px var(--f-mono); color: var(--muted); }
 .kit-pad { padding-block: 0; }
 .kit-pad [data-key] { font-size: 20px; }
@@ -184,6 +186,7 @@ body { font-family: var(--f-body); padding-block: 10px; overflow: hidden; }
           <li>Trois sorties de parcours et la préfecture déclare la manifestation terminée.</li>
           <li>Quand le slogan s'affiche, <b>répondez</b> (Espace ou le bouton) au bon moment. Un cortège qui ne chante plus se disperse.</li>
           <li>Passez près des gens sur les trottoirs : ils vous rejoignent. Le camion merguez part à 18 h.</li>
+          <li>Un groupe tout en noir proposera peut-être de passer devant. <b>C</b> pour le suivre : vitrines, mairie, lacrymo. Ou pas.</li>
         </ul>
         <div class="row"><button class="go" id="start" data-t="startBtn">Start the march</button><span class="fine" data-t="titleFine">environ 3 minutes · flèches, Espace</span><div class="lang" role="group" data-ta="langGroup" aria-label="Langue"></div></div>
       </article>
@@ -203,6 +206,7 @@ body { font-family: var(--f-body); padding-block: 10px; overflow: hidden; }
   <div class="foot">
     <p class="ticker" id="ticker" aria-live="polite"></p>
     <button class="reply" id="reply" data-th="replyBtn">Répondre <kbd>Espace</kbd></button>
+    <button class="reply casse" id="casse" hidden>Suivre la casse <kbd>C</kbd></button>
     <div class="kit-pad"><button data-key="ArrowLeft" aria-label="Gauche">◀</button><button data-key="ArrowUp" aria-label="Haut">▲</button><button data-key="ArrowDown" aria-label="Bas">▼</button><button data-key="ArrowRight" aria-label="Droite">▶</button></div>
     <span class="keys" data-t="keys">flèches ou ZQSD · Espace pour répondre</span>
   </div>
@@ -212,6 +216,7 @@ body { font-family: var(--f-body); padding-block: 10px; overflow: hidden; }
     <div class="sign count"><span data-t="countL">Participants</span>
       <div class="pair"><b id="count-org">1</b><small id="count-org-l">selon les organisateurs</small><b id="count-pref">0</b><small id="count-pref-l">selon la préfecture</small></div></div>
     <div class="meter"><span><span data-t="voiceL">Voix du cortège</span><em id="voice-n">60</em></span><div class="bar"><i id="voice"></i></div></div>
+    <div class="meter" id="gas-m" hidden><span><span data-t="gasL">Lacrymo</span><em id="gas-n">0</em></span><div class="bar"><i id="gas" class="gas"></i></div></div>
     <div class="sign"><span data-t="strikesL">Avertissements</span><b class="strikes" id="strikes">○○○</b></div>
     <div class="lang" role="group" data-ta="langGroup" aria-label="Langue"></div>
   </header>
@@ -354,7 +359,8 @@ const view = Kit.canvas($('#map'));
 
 // The city: a grid of street corners. Ids are r * COLS + c.
 const COLS = 9, ROWS = 6;
-const START = 5 * COLS + 0, PLACE = 0 * COLS + 8;
+const START = 5 * COLS + 0, PLACE = 0 * COLS + 8, MAIRIE = 2 * COLS + 4;
+const SHOPS = 8, BLOC_AFTER = 35;
 const DAY_START = 14 * 60, DAY_END = 18 * 60, MIN_PER_S = 240 / 210;
 const MAX_STRIKES = 3, AMEND_EVERY = 28;
 const rc = id => [Math.floor(id / COLS), id % COLS];
@@ -408,6 +414,7 @@ const GROUPS = [
   { id: 'bakers', n: [8, 15], voice: 3 },
   { id: 'cyclists', n: [10, 25], voice: 2 },
 ];
+const BLOC = { id: 'bloc', n: [30, 60], voice: 0, bloc: true };
 
 const I18N = {
   fr: {
@@ -418,7 +425,8 @@ const I18N = {
     titleList: "<li><b>Guidez</b> le cortège avec les flèches (ou ZQSD, ou en touchant le plan) jusqu'à la place, en restant sur le parcours déclaré, en pointillés bleus. Il change en cours de route.</li>"
       + '<li>Trois sorties de parcours et la préfecture déclare la manifestation terminée.</li>'
       + "<li>Quand le slogan s'affiche, <b>répondez</b> (Espace ou le bouton) au bon moment. Un cortège qui ne chante plus se disperse.</li>"
-      + '<li>Passez près des gens sur les trottoirs : ils vous rejoignent. Le camion merguez part à 18 h.</li>',
+      + '<li>Passez près des gens sur les trottoirs : ils vous rejoignent. Le camion merguez part à 18 h.</li>'
+      + "<li>Un groupe tout en noir proposera peut-être de passer devant. <b>C</b> pour le suivre : vitrines, mairie, lacrymo. Ou pas.</li>",
     startBtn: 'Lancer le cortège', titleFine: 'environ 3 minutes · flèches, Espace',
     againBtn: 'Redéclarer une manif',
     replyBtn: 'Répondre <kbd>Espace</kbd>', keys: 'flèches ou ZQSD · Espace pour répondre',
@@ -471,9 +479,30 @@ const I18N = {
         b: () => "Il est 18 h. Le camion merguez replie son auvent et s'en va. Sans merguez, un cortège n'a plus vraiment de raison d'être. On se donne rendez-vous jeudi, même heure, même slogan." },
       banned: { k: 'Préfecture · courrier recommandé', t: 'Manifestation déclarée terminée',
         b: () => "Troisième sortie de parcours. La préfecture déclare la manifestation terminée, par courrier recommandé. Il arrivera dans trois à cinq jours ouvrés. Tout le cortège décide de l'attendre sur place, ce qui, techniquement, est un rassemblement." },
+      nasse: { k: 'Fin de soirée · encerclement', t: 'La nasse',
+        b: () => "Les forces de l'ordre referment le cercle autour du cortège de tête. Vous attendez quatre heures sous une pluie fine, avec un mannequin, un aspirateur robot et quelqu'un qui joue du djembé. Au bout d'un moment, plus personne ne sait très bien qui encercle qui. À 23 h, on vous laisse partir un par un, en échange d'un nom, que vous donnez faux, mais poliment." },
+      mairie: { k: 'Mairie de Saint-Peut-Être', t: 'La mairie brûle',
+        b: () => "Le cortège de tête atteint la mairie. D'abord une fumée noire, puis tout le bâtiment. Le lendemain, le maire annonce à la télévision un grand plan de reconstruction en carton recyclé, puis un référendum sur la couleur du carton. Le camion merguez n'a pas osé venir." },
     },
-    statNames: ['Organisateurs', 'Préfecture', 'Slogans repris', 'Rues parcourues', 'Arrêtés reçus'],
+    statNames: ['Organisateurs', 'Préfecture', 'Slogans repris', 'Rues parcourues', 'Arrêtés reçus', 'Vitrines'],
     best: b => `record de la session : ${b} personnes`,
+    mairie: 'MAIRIE', blocName: 'Le cortège de tête',
+    blocJoin: 'Un groupe tout en noir se glisse devant la banderole. Il propose de « changer un peu le parcours ». Touche C pour le suivre.',
+    casseBtn: 'Suivre la casse <kbd>C</kbd>', calmBtn: 'Se calmer <kbd>C</kbd>',
+    casseOn: "Vous suivez le cortège de tête. Les familles, derrière, ralentissent nettement.",
+    casseOff: 'Vous ralentissez. Le cortège de tête continue sans vous, en râlant.',
+    gasL: 'Lacrymo', bannerCasse: 'TOUT CASSER (UN PEU)',
+    shopNames: ['LUXE ET PLUS', 'BANQUE DU CRÉDIT', 'PHONIX', 'MÉGAMARCHÉ', 'PRÊT-À-PORTÉE', 'BOULANGERIE'],
+    loot: [
+      'Une vitrine de luxe. Le sac à main coûte plus cher que la boutique. Personne n\'arrive à le soulever.',
+      "Une vitrine de banque. À l'intérieur, il n'y avait qu'un dépliant sur le prêt à taux zéro. Quelqu'un le prend quand même.",
+      'Un magasin de téléphones. Tous les téléphones filment déjà.',
+      "Un supermarché. Vous ressortez avec un aspirateur robot. Il nettoie les éclats de verre derrière vous, très consciencieusement.",
+      "Un magasin de vêtements. Un mannequin rejoint le cortège. Il défile mieux que tout le monde.",
+      "La boulangerie… non. Pas la boulangerie. Tout le cortège de tête s'arrête net, s'excuse, et achète des croissants.",
+    ],
+    mairiePass: "La mairie. Quelqu'un salue le maire à la fenêtre. Le maire salue en retour, prudemment.",
+    gasHigh: "L'air pique. Des grenades lacrymogènes tombent devant le cortège. Tout le monde pleure, y compris les pigeons.",
   },
   en: {
     docTitle: 'The March', langGroup: 'Language',
@@ -483,7 +512,8 @@ const I18N = {
     titleList: '<li><b>Steer</b> the march with the arrow keys (or WASD, or by tapping the map) to the square, staying on the declared route, dashed in blue. It changes on the way.</li>'
       + '<li>Leave the route three times and the authorities declare the protest over.</li>'
       + '<li>When a chant appears, <b>answer</b> it (Space or the button) at the right moment. A march that stops chanting breaks up.</li>'
-      + '<li>Pass close to people on the pavement and they join in. The merguez van leaves at 6 pm.</li>',
+      + '<li>Pass close to people on the pavement and they join in. The merguez van leaves at 6 pm.</li>'
+      + '<li>A group dressed all in black may offer to go in front. <b>C</b> to follow it: shop windows, the town hall, tear gas. Or not.</li>',
     startBtn: 'Start the march', titleFine: 'about 3 minutes · arrows, Space',
     againBtn: 'Declare another march',
     replyBtn: 'Answer <kbd>Space</kbd>', keys: 'arrows or WASD · Space to answer',
@@ -536,9 +566,30 @@ const I18N = {
         b: () => 'It is 6 pm. The merguez van folds its awning and drives off. Without merguez, a march has no real reason to exist. Same time Thursday, same chant.' },
       banned: { k: 'Prefecture · recorded delivery', t: 'Protest declared over',
         b: () => 'A third time off the route. The prefecture declares the protest over, by recorded letter. It will arrive in three to five working days. The whole march decides to wait for it right here, which, technically, is a rally.' },
+      nasse: { k: 'Late evening · kettled', t: 'Kettled',
+        b: () => 'The police close the ring around the black bloc. You wait four hours in fine rain, with a mannequin, a robot vacuum and someone playing the djembe. After a while nobody is quite sure who is kettling whom. At 11 pm you are let out one by one, in exchange for a name, which you give falsely, but politely.' },
+      mairie: { k: 'Town hall of Saint-Perhaps', t: 'The town hall burns',
+        b: () => 'The black bloc reaches the town hall. First black smoke, then the whole building. The next day the mayor announces on television a great reconstruction plan in recycled cardboard, followed by a referendum on the colour of the cardboard. The merguez van did not dare to come.' },
     },
-    statNames: ['Organisers', 'Police', 'Chants answered', 'Streets marched', 'Orders received'],
+    statNames: ['Organisers', 'Police', 'Chants answered', 'Streets marched', 'Orders received', 'Windows'],
     best: b => `best this session: ${b} people`,
+    mairie: 'TOWN HALL', blocName: 'The black bloc',
+    blocJoin: 'A group dressed all in black slips in front of the banner. It suggests "changing the route a bit". Press C to follow it.',
+    casseBtn: 'Follow the black bloc <kbd>C</kbd>', calmBtn: 'Calm down <kbd>C</kbd>',
+    casseOn: 'You follow the black bloc. The families behind you slow down noticeably.',
+    casseOff: 'You slow down. The black bloc carries on without you, grumbling.',
+    gasL: 'Tear gas', bannerCasse: 'SMASH IT ALL (A BIT)',
+    shopNames: ['LUXE & MORE', 'CREDIT BANK', 'PHONIX', 'MEGAMART', 'READY-TO-WEAR', 'BAKERY'],
+    loot: [
+      'A luxury boutique. The handbag costs more than the shop. Nobody can lift it.',
+      'A bank. Inside there was only a leaflet about zero-interest loans. Someone takes it anyway.',
+      'A phone shop. Every phone is already filming.',
+      'A supermarket. You come out with a robot vacuum. It sweeps up the broken glass behind you, very conscientiously.',
+      'A clothes shop. A mannequin joins the march. It walks it better than anyone.',
+      'The bakery… no. Not the bakery. The whole black bloc stops dead, apologises, and buys croissants.',
+    ],
+    mairiePass: 'The town hall. Someone waves at the mayor in the window. The mayor waves back, carefully.',
+    gasHigh: 'The air stings. Tear gas canisters land ahead of the march. Everyone is crying, pigeons included.',
   },
 };
 
@@ -561,9 +612,22 @@ for (const k of ['calls', 'amend', 'statNames']) {
 }
 
 let S;
+// Shopfronts sit on streets (an edge between two corners), away from the start and the square.
+const edgeKey = (a, b) => a < b ? `${a}-${b}` : `${b}-${a}`;
+function makeShops() {
+  const out = new Map();
+  while (out.size < SHOPS) {
+    const a = Math.floor(Math.random() * COLS * ROWS), b = Kit.pick(neighbours(a));
+    if ([a, b].some(x => x === START || x === PLACE || x === MAIRIE)) continue;
+    const k = edgeKey(a, b);
+    if (!out.has(k)) out.set(k, { a, b, kind: out.size % 6, smashed: false });
+  }
+  return out;
+}
 function fresh(best = 0) {
   const route = makeRoute(START);
   return {
+    shops: makeShops(), bloc: false, casse: false, tension: 0, windows: 0, blocT: BLOC_AFTER,
     mode: 'title', best, t: 0, clock: DAY_START,
     a: START, b: route[1], u: 0, want: null, route,
     count: 1, voice: 60, strikes: 0, streets: 0, orders: 0, chantsOk: 0,
@@ -594,12 +658,15 @@ function hud() {
   const v = Math.round(S.voice);
   $('#voice').style.width = v + '%'; $('#voice-n').textContent = v;
   $('#strikes').textContent = '●'.repeat(S.strikes) + '○'.repeat(MAX_STRIKES - S.strikes);
+  const g = Math.round(S.tension);
+  $('#gas').style.width = g + '%'; $('#gas-n').textContent = g;
 }
 
 function startGame() {
   S = fresh(S ? S.best : 0);
   S.mode = 'march';
   $('#memo').hidden = true; $('#chant').hidden = true;
+  $('#casse').hidden = true; $('#gas-m').hidden = true;
   tick(() => t('tickStart'));
   Kit.show(null);
   hud();
@@ -613,8 +680,17 @@ Kit.keys.onPress((k, down) => {
   const key = KEYMAP[k] || k;
   if (DIRS[key]) S.want = DIRS[key];
   else if (k === ' ') answer();
+  else if (k === 'c') toggleCasse();
 });
 $('#reply').onclick = e => { e.currentTarget.blur(); answer(); };
+$('#casse').onclick = e => { e.currentTarget.blur(); toggleCasse(); };
+function casseLabel() { $('#casse').innerHTML = t(S.casse ? 'calmBtn' : 'casseBtn'); }
+function toggleCasse() {
+  if (!S || S.mode !== 'march' || !S.bloc) return;
+  S.casse = !S.casse;
+  casseLabel();
+  tick(() => t(S.casse ? 'casseOn' : 'casseOff'));
+}
 $('#map').addEventListener('pointerdown', e => {
   if (!S || S.mode !== 'march') return;
   const r = e.currentTarget.getBoundingClientRect(), g = geo();
@@ -633,8 +709,20 @@ function nextFrom(at, from) {
   return opts.length ? Kit.pick(opts) : from;
 }
 
-function arrive(at) {
+function arrive(at, from) {
   S.streets++;
+  const shop = S.shops.get(edgeKey(from, at));
+  if (shop && S.casse && !shop.smashed) {
+    shop.smashed = true;
+    const kind = shop.kind;
+    // the bakery is spared: the black bloc buys croissants instead
+    if (kind !== 5) { S.windows++; S.tension = Math.min(100, S.tension + 14); S.voice = Math.min(100, S.voice + 6); }
+    tick(() => t('loot')[kind]);
+  }
+  if (at === MAIRIE) {
+    if (S.casse) return endGame('mairie');
+    tick(() => t('mairiePass'));
+  }
   if (at === PLACE) return endGame('arrived');
   const i = S.route.indexOf(at);
   if (i >= 0) S.route = S.route.slice(i);
@@ -673,14 +761,14 @@ function paintChant() {
   $('#chant-p').textContent = ch.phase === 'ok' ? resp : call;
 }
 
-function spawnGroup() {
+function spawnGroup(only) {
   // a group waits on a street the march has not just walked down
   for (let tries = 0; tries < 20; tries++) {
     const a = Math.floor(Math.random() * COLS * ROWS), b = Kit.pick(neighbours(a));
     if ((a === S.a && b === S.b) || (a === S.b && b === S.a)) continue;
     if (S.groups.some(g => (g.a === a && g.b === b) || (g.a === b && g.b === a))) continue;
-    const def = Kit.pick(GROUPS);
-    S.groups.push({ a, b, def, n: Math.round(Kit.rnd(def.n[0], def.n[1])), life: Kit.rnd(18, 28), ph: Math.random() * 6 });
+    const def = only || Kit.pick(GROUPS);
+    S.groups.push({ a, b, def, n: Math.round(Kit.rnd(def.n[0], def.n[1])), life: def.bloc ? 40 : Kit.rnd(18, 28), ph: Math.random() * 6 });
     return;
   }
 }
@@ -695,7 +783,7 @@ function update(dt) {
     S.u -= 1;
     const from = S.a, at = S.b;
     S.a = at;
-    arrive(at);
+    arrive(at, from);
     if (S.mode !== 'march') return;
     S.b = nextFrom(at, from);
   }
@@ -709,6 +797,12 @@ function update(dt) {
     gp.life -= dt;
     const gpPos = mid(gp.a, gp.b);
     if (Math.hypot(gpPos[0] - pos[0], gpPos[1] - pos[1]) < .32) {
+      if (gp.def.bloc) {
+        S.bloc = true; S.count += gp.n;
+        $('#casse').hidden = false; $('#gas-m').hidden = false; casseLabel();
+        tick(() => t('blocJoin'));
+        return false;
+      }
       const joined = Math.max(1, Math.round(gp.n * (.5 + S.voice / 200)));
       S.count += joined;
       S.voice = Math.min(100, S.voice + gp.def.voice);
@@ -720,6 +814,17 @@ function update(dt) {
   });
   S.spawnT -= dt;
   if (S.spawnT <= 0 && S.groups.length < 6) { spawnGroup(); S.spawnT = Kit.rnd(2.2, 4); }
+  // the black bloc turns up once, a while into the march, and waits until met
+  if (!S.bloc && (S.blocT -= dt) <= 0 && !S.groups.some(gp => gp.def.bloc)) { spawnGroup(BLOC); S.blocT = 20; }
+
+  // following the black bloc: families peel off, the tear gas builds; calming down lets it clear
+  if (S.casse) {
+    S.count = Math.max(1, S.count - Math.ceil(S.count * .008 * dt));
+    S.tension = Math.min(100, S.tension + dt * 1.6);
+  } else S.tension = Math.max(0, S.tension - dt * 2.5);
+  if (S.tension >= 60 && !S.gasSaid) { S.gasSaid = true; tick(() => t('gasHigh')); }
+  if (S.tension < 40) S.gasSaid = false;
+  if (S.tension >= 100) return endGame('nasse');
 
   // the préfecture amends the route now and then, from wherever the march is heading
   S.amendT -= dt;
@@ -774,7 +879,7 @@ function paintEnd() {
   $('#end-k').textContent = E.k;
   $('#end-title').textContent = E.t;
   $('#end-body').textContent = E.b(o, p);
-  const vals = [o, p, S.chantsOk, S.streets, S.orders];
+  const vals = [o, p, S.chantsOk, S.streets, S.orders, S.windows];
   $('#end-stats').innerHTML = t('statNames').map((k, i) => `<div><span>${k}</span><b>${vals[i]}</b></div>`).join('');
   $('#end-best').textContent = t('best')(S.best.toLocaleString(loc));
 }
@@ -815,6 +920,33 @@ function draw() {
   cx.fillStyle = C.ink; cx.font = `600 ${Math.max(8, Math.round(s * .07))}px Martian Mono, monospace`;
   cx.fillText(t('merguez'), qx - s * .49, qy - s * .27, s * .6);
 
+  // shopfronts along their street: an awning and a window, cracked once smashed
+  const fdisp = getComputedStyle(document.documentElement).getPropertyValue('--f-display');
+  for (const sh of S.shops.values()) {
+    const [ax, ay] = px(g, sh.a), [bx, by] = px(g, sh.b), horiz = ay === by;
+    const mx = (ax + bx) / 2, my = (ay + by) / 2, w = s * .5, h = s * .14;
+    const x = horiz ? mx - w / 2 : mx + street / 2, y = horiz ? my + street / 2 : my - w / 2;
+    const ww = horiz ? w : h, hh = horiz ? h : w;
+    cx.fillStyle = sh.kind === 5 ? C.gold : C.card; cx.fillRect(x, y, ww, hh);
+    cx.strokeStyle = C.ink; cx.lineWidth = 1; cx.strokeRect(x, y, ww, hh);
+    if (sh.smashed && sh.kind !== 5) {
+      cx.strokeStyle = C.ink; cx.beginPath();
+      cx.moveTo(x + ww * .2, y); cx.lineTo(x + ww * .5, y + hh * .6); cx.lineTo(x + ww * .8, y + hh * .1);
+      cx.moveTo(x + ww * .5, y + hh * .6); cx.lineTo(x + ww * .45, y + hh); cx.stroke();
+    }
+    cx.save(); cx.translate(x + ww / 2, y + hh / 2); if (!horiz) cx.rotate(Math.PI / 2);
+    cx.fillStyle = C['card-ink']; cx.font = `600 ${Math.max(7, Math.round(s * .06))}px Martian Mono, monospace`;
+    cx.fillText(t('shopNames')[sh.kind], 0, 1, w - 4); cx.restore();
+  }
+  // the town hall, on its corner, with a flag
+  const [mhx, mhy] = px(g, MAIRIE), mw = s * .5;
+  cx.fillStyle = S.ending === 'mairie' ? C.accent : C.panel;
+  cx.fillRect(mhx + street / 2, mhy + street / 2, mw, mw * .7);
+  cx.strokeStyle = C.ink; cx.lineWidth = 1.5; cx.strokeRect(mhx + street / 2, mhy + street / 2, mw, mw * .7);
+  cx.fillStyle = C.route; cx.fillRect(mhx + street / 2 + mw * .7, mhy + street / 2 - s * .14, s * .1, s * .07);
+  cx.fillStyle = C.ink; cx.font = `400 ${Math.max(8, Math.round(s * .08))}px ${fdisp}`;
+  cx.fillText(t('mairie'), mhx + street / 2 + mw / 2, mhy + street / 2 + mw * .35, mw - 4);
+
   // the declared route
   cx.save();
   cx.strokeStyle = C.route; cx.lineWidth = Math.max(3, s * .05); cx.setLineDash([s * .12, s * .1]); cx.lineCap = 'round';
@@ -834,7 +966,7 @@ function draw() {
       const a = i * 2.4 + gp.ph, rr = s * .05 + (i % 4) * s * .025;
       cx.beginPath(); cx.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, Math.max(2, s * .028), 0, 7); cx.fill();
     }
-    cx.fillStyle = C.card; const lbl = t('groups')[gp.def.id][0];
+    cx.fillStyle = C.card; const lbl = gp.def.bloc ? t('blocName') : t('groups')[gp.def.id][0];
     cx.font = `600 ${Math.max(9, Math.round(s * .085))}px Archivo, sans-serif`;
     const tw = Math.min(s * 1.3, cx.measureText(lbl).width) + 8;
     cx.fillRect(x - tw / 2, y - s * .25, tw, s * .13);
@@ -871,8 +1003,19 @@ function draw() {
   cx.fillStyle = C.panel; cx.fillRect(-bw / 2, -bh / 2, bw, bh);
   cx.strokeStyle = C.accent; cx.lineWidth = 2; cx.strokeRect(-bw / 2, -bh / 2, bw, bh);
   cx.fillStyle = C.accent; cx.font = `400 ${Math.max(7, Math.round(bh * .55))}px ${getComputedStyle(document.documentElement).getPropertyValue('--f-display')}`;
-  cx.fillText(t('banner'), 0, 1, bw - 6);
+  cx.fillText(t(S.casse ? 'bannerCasse' : 'banner'), 0, 1, bw - 6);
   cx.restore();
+  // tear gas drifting round the head of the march
+  if (S.tension > 25) {
+    const k = (S.tension - 25) / 75;
+    cx.fillStyle = C.panel;
+    for (let i = 0; i < 7; i++) {
+      const a = i * .9 + (Kit.reduce ? 0 : S.t * .3), r = s * (.3 + (i % 3) * .2);
+      cx.globalAlpha = .25 * k;
+      cx.beginPath(); cx.arc(hx + Math.cos(a) * r, hy + Math.sin(a) * r * .7, s * (.2 + k * .25), 0, 7); cx.fill();
+    }
+    cx.globalAlpha = 1;
+  }
 }
 
 const loop = Kit.loop(dt => {
@@ -896,6 +1039,7 @@ function applyLang() {
   hud();
   $('#ticker').textContent = tickFn();
   if (memoFn && !$('#memo').hidden) { $('#memo-h').textContent = t(memoWarn ? 'warnH' : 'prefH'); $('#memo-t').textContent = memoFn(); }
+  casseLabel();
   if (S.mode === 'march') paintChant();
   if (S.mode === 'end') paintEnd();
 }
@@ -931,6 +1075,10 @@ Kit.expose({
     merguez: { seconds: 8, jump() { startGame(); S.clock = DAY_END - 2; S.voice = 100; S.chant.t = 30; }, reached: () => S.ending === 'merguez' && !$('#end').hidden },
     // the route is reduced to the square alone, so the next corner is off it
     banned: { seconds: 8, jump() { startGame(); S.strikes = 2; S.voice = 100; S.chant.t = 30; S.a = START; S.b = START - COLS; S.u = 0; S.route = [PLACE]; }, reached: () => S.ending === 'banned' && !$('#end').hidden },
+    // following the black bloc with the tear gas nearly full: the game's own build-up closes the ring
+    nasse: { seconds: 8, jump() { startGame(); S.bloc = true; S.casse = true; S.tension = 95; S.voice = 100; S.chant.t = 30; }, reached: () => S.ending === 'nasse' && !$('#end').hidden },
+    // one street from the town hall, with the black bloc in front
+    mairie: { seconds: 8, jump() { startGame(); S.bloc = true; S.casse = true; S.voice = 100; S.chant.t = 30; S.a = MAIRIE - 1; S.b = MAIRIE; S.u = 0; S.route = [MAIRIE, ...path(MAIRIE, PLACE).slice(1)]; S.trail = []; }, reached: () => S.ending === 'mairie' && !$('#end').hidden },
   },
 });
 </script>
